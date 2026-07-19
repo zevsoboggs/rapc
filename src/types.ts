@@ -33,6 +33,8 @@ export interface ShippingAddress {
   phone: string;
 }
 
+export type ContractStatus = "none" | "active" | "suspended";
+
 export interface Me {
   id: string;
   email: string;
@@ -41,6 +43,9 @@ export interface Me {
   phone?: string;
   country?: string;
   status?: string;
+  contractStatus?: ContractStatus;
+  contractNumber?: string | null;
+  contractSignedAt?: string | null;
   balance?: string;
   currency?: string;
 }
@@ -62,6 +67,9 @@ export interface LedgerEntry {
 export interface DashboardData {
   balance: string;
   currency: string;
+  contractStatus?: ContractStatus;
+  contractNumber?: string | null;
+  contractSignedAt?: string | null;
   activeCards: number;
   totalCards: number;
   programs: number;
@@ -235,4 +243,44 @@ export interface Ticket {
   lastMessageAt: string;
   messages?: TicketMessage[];
   _count?: { messages: number };
+}
+
+export interface WebhookEndpoint {
+  id: string;
+  url: string;
+  events: string[];
+  secret: string;
+  description?: string | null;
+  isActive: boolean;
+  lastDeliveryAt?: string | null;
+  createdAt: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  endpointId: string;
+  event: string;
+  payload: unknown;
+  statusCode?: number | null;
+  success: boolean;
+  attempts: number;
+  error?: string | null;
+  createdAt: string;
+}
+
+export interface WebhookEventDef {
+  value: string;
+  label: string;
+}
+
+export interface BatchOrder {
+  id: string;
+  programId: string;
+  quantity: number;
+  unitCost?: string | null;
+  totalCost?: string | null;
+  status: "requested" | "in_production" | "completed" | "cancelled";
+  notes?: string | null;
+  createdAt: string;
+  program?: { id: string; name: string };
 }

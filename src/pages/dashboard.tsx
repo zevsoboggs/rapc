@@ -8,10 +8,13 @@ import {
   AppstoreOutlined,
   PlusOutlined,
   ArrowRightOutlined,
+  SafetyCertificateOutlined,
+  WarningOutlined,
+  MessageOutlined,
 } from "@ant-design/icons";
 import { api } from "../providers/axios";
-import type { DashboardData, Card, ListResult } from "../types";
-import { formatMoney } from "../utils/format";
+import type { DashboardData, Card, ListResult, ContractStatus } from "../types";
+import { formatMoney, formatDay } from "../utils/format";
 import { LedgerTable } from "../components/LedgerTable";
 import { PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
@@ -24,6 +27,128 @@ import {
   CardVisualSkeleton,
 } from "../components/Skeletons";
 import { BRAND } from "../theme";
+
+const ContractHero: React.FC<{
+  status?: ContractStatus;
+  number?: string | null;
+  signedAt?: string | null;
+}> = ({ status, number, signedAt }) => {
+  const active = status === "active";
+  const suspended = status === "suspended";
+
+  if (active) {
+    return (
+      <div
+        style={{
+          background: BRAND.gradient,
+          color: "#fff",
+          borderRadius: 16,
+          padding: "22px 26px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 20,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div
+            style={{
+              width: 46,
+              height: 46,
+              borderRadius: 12,
+              background: "rgba(255,255,255,.18)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 24,
+              flexShrink: 0,
+            }}
+          >
+            <SafetyCertificateOutlined />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, letterSpacing: ".06em", textTransform: "uppercase", opacity: 0.85 }}>
+              Platform contract
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.01em" }}>
+              Card access enabled
+            </div>
+            <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 2 }}>
+              Your contract is active — you can issue and manage cards.
+            </div>
+          </div>
+        </div>
+        <div style={{ textAlign: "right", minWidth: 150 }}>
+          <div style={{ fontSize: 12, opacity: 0.8 }}>Contract</div>
+          <div className="tabular" style={{ fontSize: 16, fontWeight: 600, fontFamily: "monospace" }}>
+            {number || "—"}
+          </div>
+          {signedAt && (
+            <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2 }}>
+              Signed {formatDay(signedAt)}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // No contract / suspended → gated
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: `1px solid ${suspended ? "#FDE68A" : "#FECACA"}`,
+        borderLeft: `4px solid ${suspended ? BRAND.warning : BRAND.error}`,
+        borderRadius: 16,
+        padding: "22px 26px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 20,
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: 12,
+            background: suspended ? BRAND.warningSoft : BRAND.errorSoft,
+            color: suspended ? BRAND.warning : BRAND.error,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 24,
+            flexShrink: 0,
+          }}
+        >
+          <WarningOutlined />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, letterSpacing: ".06em", textTransform: "uppercase", color: BRAND.textMuted }}>
+            Platform contract
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.textPrimary, letterSpacing: "-0.01em" }}>
+            {suspended ? "Card access suspended" : "Card access not enabled"}
+          </div>
+          <div style={{ fontSize: 13.5, color: BRAND.textSecondary, marginTop: 2, maxWidth: 560 }}>
+            {suspended
+              ? "Your contract is on hold, so card issuance is temporarily paused. Contact your account manager to restore access."
+              : "Issuing and managing cards requires a signed platform contract. Contact your account manager to sign a contract and unlock card access."}
+          </div>
+        </div>
+      </div>
+      <Link to="/support">
+        <Button type="primary" icon={<MessageOutlined />} danger={!suspended}>
+          Contact manager
+        </Button>
+      </Link>
+    </div>
+  );
+};
 
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: "Active",
@@ -92,6 +217,17 @@ export const DashboardPage: React.FC = () => {
 
       {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 20 }} />}
 
+      {/* Contract / card-access hero */}
+      {!loading && data && (
+        <div style={{ marginBottom: 20 }}>
+          <ContractHero
+            status={data.contractStatus}
+            number={data.contractNumber}
+            signedAt={data.contractSignedAt}
+          />
+        </div>
+      )}
+
       {/* Stat row */}
       <Row gutter={[20, 20]}>
         {loading ? (
@@ -104,7 +240,7 @@ export const DashboardPage: React.FC = () => {
           <>
             <Col xs={24} sm={12} xl={6}>
               <StatCard
-                highlight
+                tint="blue"
                 icon={<WalletOutlined />}
                 label="Available Balance"
                 value={formatMoney(data!.balance, data!.currency)}
@@ -112,7 +248,6 @@ export const DashboardPage: React.FC = () => {
                   <Button
                     icon={<PlusOutlined />}
                     onClick={() => navigate("/deposits?new=1")}
-                    style={{ background: "rgba(255,255,255,.16)", borderColor: "rgba(255,255,255,.3)", color: "#fff" }}
                   >
                     Add funds
                   </Button>

@@ -1,9 +1,19 @@
 import { useEffect, useState } from "react";
-import { Row, Col, Empty, App as AntdApp, Button } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import {
+  Row,
+  Col,
+  Empty,
+  App as AntdApp,
+  Button,
+  Modal,
+  Form,
+  InputNumber,
+  Input,
+} from "antd";
+import { PlusOutlined, InboxOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { api } from "../providers/axios";
-import type { Program } from "../types";
+import type { Program, BatchOrder } from "../types";
 import { formatMoney } from "../utils/format";
 import { CardTypeTag } from "../components/CardTypeTag";
 import { PageHeader } from "../components/PageHeader";
@@ -25,6 +35,11 @@ export const ProgramsPage: React.FC = () => {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [batchProgram, setBatchProgram] = useState<Program | null>(null);
+  const [ordering, setOrdering] = useState(false);
+  const [batchForm] = Form.useForm<{ quantity: number; notes?: string }>();
+  const quantity = Form.useWatch("quantity", batchForm);
+
   useEffect(() => {
     api
       .get<Program[]>("/portal/programs")
@@ -32,6 +47,40 @@ export const ProgramsPage: React.FC = () => {
       .catch(() => message.error("Failed to load programs."))
       .finally(() => setLoading(false));
   }, [message]);
+
+  const unitCost = batchProgram
+    ? (parseFloat(batchProgram.issuanceFee ?? "0") || 0) +
+      (parseFloat(batchProgram.shippingFee ?? "0") || 0)
+    : 0;
+  const estimatedCost = unitCost * (Number(quantity) || 0);
+
+  const openBatch = (program: Program) => {
+    batchForm.resetFields();
+    setBatchProgram(program);
+  };
+
+  const submitBatch = async (values: { quantity: number; notes?: string }) => {
+    if (!batchProgram) return;
+    setOrdering(true);
+    try {
+      await api.post<BatchOrder>("/portal/batch-orders", {
+        programId: batchProgram.id,
+        quantity: values.quantity,
+        notes: values.notes,
+      });
+      message.success("Batch order placed.");
+      setBatchProgram(null);
+      batchForm.resetFields();
+      navigate("/batch-orders");
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to place batch order.";
+      message.error(msg);
+    } finally {
+      setOrdering(false);
+    }
+  };
 
   return (
     <div>
@@ -97,9 +146,16 @@ export const ProgramsPage: React.FC = () => {
 
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, gap: 12 }}>
                     <StatusPill status="Enabled" color="success" />
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`/cards?issue=${p.id}`)}>
-                      Issue card
-                    </Button>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      {p.cardType === "PHYSICAL" && (
+                        <Button icon={<InboxOutlined />} onClick={() => openBatch(p)}>
+                          Order batch
+                        </Button>
+                      )}
+                      <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`/cards?issue=${p.id}`)}>
+                        Issue card
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -107,6 +163,66 @@ export const ProgramsPage: React.FC = () => {
           ))}
         </Row>
       )}
+
+      {/* Order batch modal */}
+      <Modal
+        title={
+          batchProgram ? `Order card batch — ${batchProgram.name}` : "Order card batch"
+        }
+        open={!!batchProgram}
+        onCancel={() => setBatchProgram(null)}
+        onOk={() => batchForm.submit()}
+        okText="Place order"
+        confirmLoading={ordering}
+        destroyOnClose
+      >
+        <Form
+          form={batchForm}
+          layout="vertical"
+          onFinish={submitBatch}
+          initialValues={{ quantity: 10 }}
+        >
+          <Form.Item
+            label="Quantity"
+            name="quantity"
+            rules={[{ required: true, message: "Please enter a quantity" }]}
+            extra="Number of physical cards to produce (1–1000)."
+          >
+            <InputNumber style={{ width: "100%" }} min={1} max={1000} step={10} />
+          </Form.Item>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "12px 14px",
+              marginBottom: 16,
+              background: BRAND.primarySoft,
+              border: `1px solid ${BRAND.primarySoft2}`,
+              borderRadius: 12,
+            }}
+          >
+            <span style={{ color: BRAND.textSecondary, fontSize: 13 }}>
+              Estimated cost
+            </span>
+            <span
+              className="tabular"
+              style={{ fontWeight: 700, fontSize: 15, color: BRAND.textPrimary }}
+            >
+              {formatMoney(estimatedCost, batchProgram?.currency)}
+            </span>
+          </div>
+          <div style={{ fontSize: 12.5, color: BRAND.textMuted, marginTop: -8, marginBottom: 14 }}>
+            {formatMoney(unitCost, batchProgram?.currency)} per card ×{" "}
+            {Number(quantity) || 0}. Debited from your balance on order.
+          </div>
+
+          <Form.Item label="Notes" name="notes">
+            <Input.TextArea rows={3} placeholder="Optional notes for this order…" maxLength={1000} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

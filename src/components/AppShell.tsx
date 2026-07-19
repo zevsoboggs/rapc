@@ -18,6 +18,8 @@ import {
   PlusOutlined,
   CarOutlined,
   MessageOutlined,
+  ThunderboltOutlined,
+  InboxOutlined,
 } from "@ant-design/icons";
 import { Brand } from "./Brand";
 import { WhatsNewModal } from "./WhatsNewModal";
@@ -39,6 +41,7 @@ const NAV: {
     items: [
       { to: "/cards", label: "Cards", icon: <CreditCardOutlined /> },
       { to: "/programs", label: "Programs", icon: <AppstoreOutlined /> },
+      { to: "/batch-orders", label: "Card batches", icon: <InboxOutlined /> },
       { to: "/deliveries", label: "Deliveries", icon: <CarOutlined /> },
     ],
   },
@@ -53,6 +56,7 @@ const NAV: {
     group: "Developer",
     items: [
       { to: "/settings/api-keys", label: "API keys", icon: <ApiOutlined /> },
+      { to: "/webhooks", label: "Webhooks", icon: <ThunderboltOutlined /> },
       { to: "/support", label: "Support", icon: <MessageOutlined /> },
     ],
   },
@@ -62,10 +66,12 @@ const TITLES: Record<string, string> = {
   "/": "Dashboard",
   "/cards": "Cards",
   "/programs": "Card programs",
+  "/batch-orders": "Card batches",
   "/deliveries": "Deliveries",
   "/deposits": "Add funds",
   "/billing": "Billing & ledger",
   "/settings/api-keys": "API keys",
+  "/webhooks": "Webhooks",
   "/support": "Support",
 };
 
