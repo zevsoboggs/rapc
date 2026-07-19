@@ -42,6 +42,7 @@ import { PageHeader } from "../../components/PageHeader";
 import { SectionCard } from "../../components/SectionCard";
 import { MoneyText } from "../../components/MoneyText";
 import { CardVisual } from "../../components/CardVisual";
+import { ProgramTile } from "../../components/ProgramTile";
 import { CardVisualSkeleton, TableSkeleton } from "../../components/Skeletons";
 import { BRAND } from "../../theme";
 
@@ -323,17 +324,11 @@ export const CardsListPage: React.FC = () => {
         {/* Live card preview */}
         {selectedProgram && (
           <div style={{ marginBottom: 20 }}>
-            <CardVisual
-              program={selectedProgram}
-              width="100%"
-              face={{
-                artworkSvg: selectedProgram.artworkSvg,
-                cardColor: selectedProgram.cardColor,
-                last4: "0000",
-                holder: form.getFieldValue("holderEmail") || "RAPIDCARD USER",
-                network: selectedProgram.network,
-                cardType: selectedProgram.cardType,
-              }}
+            <ProgramTile
+              name={selectedProgram.name}
+              seed={selectedProgram.id}
+              color={selectedProgram.cardColor}
+              height={180}
             />
           </div>
         )}
