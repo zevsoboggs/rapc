@@ -45,6 +45,7 @@ import type {
 import { formatMoney } from "../../utils/format";
 import { CardVisualSkeleton, TableSkeleton } from "../../components/Skeletons";
 import { CopyField, CopyInfoRow, copyText } from "../../components/CopyField";
+import { svgUrl } from "../../components/ProgramTile";
 import { BRAND, CARD_SHADOW } from "../../theme";
 
 const cardBox: React.CSSProperties = {
@@ -277,6 +278,7 @@ export const CardShowPage: React.FC = () => {
   const isReleased = card.status === "RELEASED";
   const limit = 50000;
   const title = card.label || card.program?.name || "Card";
+  const art = svgUrl(card.program?.artworkSvg);
   const balancePastel = card.program?.cardColor && card.program.cardColor.includes("gradient")
     ? card.program.cardColor
     : "linear-gradient(135deg, #c6d2fb 0%, #dfd3f4 100%)";
@@ -293,23 +295,40 @@ export const CardShowPage: React.FC = () => {
         {/* Left panel */}
         <div style={{ flex: "1 1 340px", maxWidth: 400, minWidth: 300 }}>
           <div style={{ ...cardBox, padding: 20 }}>
-            {/* Pastel balance face */}
-            <div style={{ position: "relative", borderRadius: 16, background: balancePastel, padding: "22px 22px 18px", minHeight: 176, display: "flex", flexDirection: "column", justifyContent: "space-between", filter: isReleased ? "grayscale(.7) opacity(.7)" : undefined }}>
-              <div className="tabular" style={{ fontSize: 30, fontWeight: 800, color: "#1e293b", letterSpacing: "-0.02em" }}>
-                {formatMoney(card.balance, card.currency)}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ background: "rgba(255,255,255,.7)", borderRadius: 8, padding: "4px 10px", fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
-                    •{card.last4 || card.maskedPan?.slice(-4) || "0000"}
-                  </span>
-                  <span style={{ background: "rgba(255,255,255,.7)", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 700, color: "#334155" }}>
-                    {card.currency}
-                  </span>
+            {/* Balance face */}
+            {art ? (
+              // Real artwork is a complete card design — show it clean, with the
+              // balance and chips presented above it (no overlay collisions).
+              <div>
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 13, color: BRAND.textMuted }}>Balance</div>
+                    <div className="tabular" style={{ fontSize: 30, fontWeight: 800, color: BRAND.textPrimary, letterSpacing: "-0.02em" }}>
+                      {formatMoney(card.balance, card.currency)}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ background: BRAND.appBg, border: `1px solid ${BRAND.borderSubtle}`, borderRadius: 8, padding: "4px 10px", fontSize: 13, fontWeight: 600, color: BRAND.textPrimary }}>•{card.last4 || card.maskedPan?.slice(-4) || "0000"}</span>
+                    <span style={{ background: BRAND.appBg, border: `1px solid ${BRAND.borderSubtle}`, borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 700, color: BRAND.textSecondary }}>{card.currency}</span>
+                  </div>
                 </div>
-                <NetMark network={card.network} />
+                <div style={{ width: "100%", aspectRatio: "1.586 / 1", borderRadius: 16, overflow: "hidden", backgroundImage: art, backgroundSize: "cover", backgroundPosition: "center", boxShadow: "0 14px 34px -14px rgba(15,23,42,.5)", filter: isReleased ? "grayscale(.7) opacity(.7)" : undefined }} />
               </div>
-            </div>
+            ) : (
+              // Pastel face with the balance overlaid (mockup style).
+              <div style={{ position: "relative", borderRadius: 16, background: balancePastel, padding: "22px 22px 18px", minHeight: 176, display: "flex", flexDirection: "column", justifyContent: "space-between", filter: isReleased ? "grayscale(.7) opacity(.7)" : undefined }}>
+                <div className="tabular" style={{ fontSize: 30, fontWeight: 800, color: "#1e293b", letterSpacing: "-0.02em" }}>
+                  {formatMoney(card.balance, card.currency)}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ background: "rgba(255,255,255,.7)", borderRadius: 8, padding: "4px 10px", fontSize: 13, fontWeight: 600, color: "#1e293b" }}>•{card.last4 || card.maskedPan?.slice(-4) || "0000"}</span>
+                    <span style={{ background: "rgba(255,255,255,.7)", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 700, color: "#334155" }}>{card.currency}</span>
+                  </div>
+                  <NetMark network={card.network} />
+                </div>
+              </div>
+            )}
 
             {/* Action row */}
             <div style={{ display: "flex", justifyContent: "space-around", marginTop: 18 }}>

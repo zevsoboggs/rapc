@@ -328,6 +328,7 @@ export const CardsListPage: React.FC = () => {
               name={selectedProgram.name}
               seed={selectedProgram.id}
               color={selectedProgram.cardColor}
+              artworkSvg={selectedProgram.artworkSvg}
               height={180}
             />
           </div>

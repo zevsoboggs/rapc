@@ -16,6 +16,13 @@ function pickGradient(seed: string): string {
   return PASTELS[h % PASTELS.length];
 }
 
+/** Encode an SVG string into a CSS-safe data URL for use as a background image. */
+export function svgUrl(svg?: string | null): string | undefined {
+  if (!svg) return undefined;
+  if (svg.startsWith("data:") || svg.startsWith("http")) return `url("${svg}")`;
+  return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+}
+
 // Compact dark "rapid" double-chevron brand mark that reads on pastel surfaces.
 export const RapidMark: React.FC<{ size?: number; color?: string }> = ({ size = 30, color = "#1e293b" }) => (
   <svg width={size} height={size * 0.74} viewBox="0 0 34 25" fill="none" aria-hidden>
@@ -28,6 +35,8 @@ interface ProgramTileProps {
   name: string;
   seed?: string;
   color?: string | null;
+  /** Real card artwork (SVG string / data URL). When set, it becomes the full card face. */
+  artworkSvg?: string | null;
   height?: number;
   radius?: number;
   fontSize?: number;
@@ -37,19 +46,47 @@ interface ProgramTileProps {
 }
 
 /**
- * Pastel gradient card art — big category name top-left, brand mark bottom-right.
- * Matches the approved mockup for available cards and card previews.
+ * Card art. When the program has real SVG artwork it is rendered full-bleed;
+ * otherwise a soft pastel gradient tile with the category name + brand mark
+ * (matching the approved mockup).
  */
 export const ProgramTile: React.FC<ProgramTileProps> = ({
   name,
   seed,
   color,
+  artworkSvg,
   height = 150,
   radius = 18,
   fontSize = 26,
   style,
   footer,
 }) => {
+  const art = svgUrl(artworkSvg);
+
+  // Real artwork → render it as the entire card face, no drawn overlays.
+  // Width fills the parent; height follows the card aspect ratio so it can
+  // never overflow its column.
+  if (art) {
+    return (
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          aspectRatio: "1.586 / 1",
+          borderRadius: radius,
+          overflow: "hidden",
+          backgroundImage: art,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          boxShadow: "0 14px 34px -14px rgba(15,23,42,.5)",
+          ...style,
+        }}
+      >
+        {footer}
+      </div>
+    );
+  }
+
   const bg = color && color.includes("gradient") ? color : pickGradient(seed || name);
   return (
     <div

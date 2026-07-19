@@ -26,9 +26,9 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       <h1
         style={{
           margin: 0,
-          fontSize: 23,
-          fontWeight: 700,
-          letterSpacing: "-0.01em",
+          fontSize: 30,
+          fontWeight: 800,
+          letterSpacing: "-0.02em",
           color: BRAND.textPrimary,
         }}
       >

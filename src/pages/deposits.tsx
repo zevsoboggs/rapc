@@ -5,25 +5,23 @@ import {
   Button,
   Typography,
   Space,
-  Modal,
+  Drawer,
   Form,
   InputNumber,
   Select,
-  Descriptions,
   Tooltip,
-  Divider,
   App as AntdApp,
 } from "antd";
 import {
   PlusOutlined,
   CopyOutlined,
   ReloadOutlined,
-  WalletOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { QRCodeSVG } from "qrcode.react";
 import { api } from "../providers/axios";
 import type { Deposit, ListResult, FundingNetwork } from "../types";
-import { formatDate } from "../utils/format";
+import { formatDate, formatMoney } from "../utils/format";
 import { DepositStatusTag } from "../components/DepositStatusTag";
 import { PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
@@ -32,16 +30,23 @@ import { BRAND } from "../theme";
 
 const { Text } = Typography;
 
-const NETWORK_OPTIONS: { label: string; value: FundingNetwork }[] = [
-  { label: "TRC-20 (TRON)", value: "trc20" },
-  { label: "BEP-20 (BNB Chain)", value: "bep20" },
-  { label: "ERC-20 (Ethereum)", value: "erc20" },
+const NETWORK_OPTIONS: { label: string; value: FundingNetwork; chain: string }[] = [
+  { label: "Tron", value: "trc20", chain: "TRC-20" },
+  { label: "BNB Chain", value: "bep20", chain: "BEP-20" },
+  { label: "Ethereum", value: "erc20", chain: "ERC-20" },
 ];
 
-const truncate = (value: string, head = 10, tail = 6): string =>
-  value.length > head + tail + 3
-    ? `${value.slice(0, head)}…${value.slice(-tail)}`
-    : value;
+const truncate = (v: string, head = 10, tail = 6): string =>
+  v.length > head + tail + 3 ? `${v.slice(0, head)}…${v.slice(-tail)}` : v;
+
+// Small round token/chain glyph.
+const Coin: React.FC<{ bg: string; label: string; size?: number }> = ({ bg, label, size = 26 }) => (
+  <span style={{ width: size, height: size, borderRadius: "50%", background: bg, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: size * 0.5, flexShrink: 0 }}>
+    {label}
+  </span>
+);
+
+const NET_BG: Record<string, string> = { trc20: "#EB0029", bep20: "#F0B90B", erc20: "#627EEA" };
 
 export const DepositsPage: React.FC = () => {
   const { message } = AntdApp.useApp();
@@ -53,19 +58,16 @@ export const DepositsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const pageSize = 20;
 
-  const [createOpen, setCreateOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [form] = Form.useForm<{ amount: number; network: FundingNetwork }>();
-
-  const [active, setActive] = useState<Deposit | null>(null);
   const [checking, setChecking] = useState(false);
+  const [active, setActive] = useState<Deposit | null>(null);
+  const [form] = Form.useForm<{ amount: number; network: FundingNetwork; coin: string }>();
 
   const load = useCallback(() => {
     setLoading(true);
     api
-      .get<ListResult<Deposit>>("/portal/deposits", {
-        params: { limit: pageSize, offset: (page - 1) * pageSize },
-      })
+      .get<ListResult<Deposit>>("/portal/deposits", { params: { limit: pageSize, offset: (page - 1) * pageSize } })
       .then((res) => {
         setItems(res.data.items ?? []);
         setTotal(res.data.total ?? 0);
@@ -74,14 +76,12 @@ export const DepositsPage: React.FC = () => {
       .finally(() => setLoading(false));
   }, [page, message]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  // Auto-open the instructions panel when arriving via ?new=1 (Dashboard shortcut).
   useEffect(() => {
     if (searchParams.get("new") === "1") {
-      setCreateOpen(true);
+      setActive(null);
+      setOpen(true);
       searchParams.delete("new");
       setSearchParams(searchParams, { replace: true });
     }
@@ -90,11 +90,14 @@ export const DepositsPage: React.FC = () => {
   const copy = async (value: string, label: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      message.success(`${label} copied to clipboard.`);
+      message.success(`${label} copied`);
     } catch {
-      message.error(`Could not copy ${label}.`);
+      message.error(`Could not copy ${label}`);
     }
   };
+
+  const openNew = () => { setActive(null); form.resetFields(); setOpen(true); };
+  const closeDrawer = () => { setOpen(false); setActive(null); };
 
   const doCreate = async (values: { amount: number; network: FundingNetwork }) => {
     setCreating(true);
@@ -103,14 +106,10 @@ export const DepositsPage: React.FC = () => {
         amount: String(values.amount),
         network: values.network,
       });
-      setCreateOpen(false);
-      form.resetFields();
       setActive(data);
       load();
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Failed to create deposit.";
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to create deposit.";
       message.error(msg);
     } finally {
       setCreating(false);
@@ -132,23 +131,20 @@ export const DepositsPage: React.FC = () => {
     }
   };
 
+  const activeNet = active ? NETWORK_OPTIONS.find((n) => n.value === active.network) : undefined;
+  const rate = active && parseFloat(active.cryptoAmount) > 0
+    ? (parseFloat(active.amount) / parseFloat(active.cryptoAmount)).toFixed(2)
+    : "1.00";
+
   return (
     <div>
       <PageHeader
         title="Add funds"
-        subtitle="Fund your settlement balance with USDT. Create a deposit, send the exact amount to the generated address, and your balance is credited automatically once confirmed on-chain."
+        subtitle="Fund your balance with USDT. Send the exact amount to the generated address and your balance is credited automatically once confirmed on-chain."
         extra={
           <>
-            <Button icon={<ReloadOutlined />} onClick={load}>
-              Refresh
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setCreateOpen(true)}
-            >
-              New deposit
-            </Button>
+            <Button icon={<ReloadOutlined />} onClick={load}>Refresh</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openNew}>New deposit</Button>
           </>
         }
       />
@@ -159,305 +155,122 @@ export const DepositsPage: React.FC = () => {
           dataSource={items}
           loading={loading}
           scroll={{ x: true }}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            onChange: (p) => setPage(p),
-          }}
+          pagination={{ current: page, pageSize, total, onChange: (p) => setPage(p) }}
           columns={[
+            { title: "Date", dataIndex: "createdAt", render: (v: string) => formatDate(v), width: 180 },
+            { title: "Amount", dataIndex: "amount", align: "right", render: (v: string, r) => <MoneyText value={v} currency={r.currency} strong />, width: 130 },
             {
-              title: "Date",
-              dataIndex: "createdAt",
-              render: (v: string) => formatDate(v),
-              width: 180,
-            },
-            {
-              title: "Amount",
-              dataIndex: "amount",
-              align: "right",
-              render: (v: string, r) => (
-                <MoneyText value={v} currency={r.currency} strong />
-              ),
-              width: 130,
-            },
-            {
-              title: "Network / Asset",
-              key: "network",
+              title: "Network / Asset", key: "network",
               render: (_: unknown, r) => (
-                <Space direction="vertical" size={0}>
-                  <Text strong>{r.asset}</Text>
-                  <Text type="secondary" style={{ textTransform: "uppercase" }}>
-                    {r.network}
-                  </Text>
+                <Space><Coin bg={NET_BG[r.network] || "#94A3B8"} label={r.asset?.[0] || "$"} size={22} />
+                  <Space direction="vertical" size={0}><Text strong>{r.asset}</Text><Text type="secondary" style={{ textTransform: "uppercase" }}>{r.network}</Text></Space>
                 </Space>
               ),
             },
+            { title: "Status", dataIndex: "status", render: (v: string) => <DepositStatusTag status={v} />, width: 120 },
             {
-              title: "Status",
-              dataIndex: "status",
-              render: (v: string) => <DepositStatusTag status={v} />,
-              width: 120,
+              title: "Pay address", dataIndex: "payAddress",
+              render: (v?: string | null) => v ? (
+                <Space><Text style={{ fontFamily: "monospace" }}>{truncate(v)}</Text>
+                  <Tooltip title="Copy address"><Button size="small" type="text" icon={<CopyOutlined />} onClick={() => copy(v, "Pay address")} /></Tooltip></Space>
+              ) : "—",
             },
-            {
-              title: "Pay address",
-              dataIndex: "payAddress",
-              render: (v?: string | null) =>
-                v ? (
-                  <Space>
-                    <Text style={{ fontFamily: "monospace" }}>{truncate(v)}</Text>
-                    <Tooltip title="Copy address">
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<CopyOutlined />}
-                        onClick={() => copy(v, "Pay address")}
-                      />
-                    </Tooltip>
-                  </Space>
-                ) : (
-                  "—"
-                ),
-            },
-            {
-              title: "Actions",
-              key: "actions",
-              fixed: "right",
-              render: (_: unknown, r) => (
-                <Button size="small" onClick={() => setActive(r)}>
-                  View
-                </Button>
-              ),
-            },
+            { title: "", key: "actions", fixed: "right", render: (_: unknown, r) => <Button size="small" onClick={() => { setActive(r); setOpen(true); }}>View</Button> },
           ]}
         />
       </SectionCard>
 
-      {/* New deposit modal */}
-      <Modal
-        title="New deposit"
-        open={createOpen}
-        onCancel={() => setCreateOpen(false)}
-        onOk={() => form.submit()}
-        okText="Create deposit"
-        confirmLoading={creating}
-        destroyOnClose
+      {/* ── Add funds drawer ─────────────────────────────────── */}
+      <Drawer
+        title="Add funds"
+        placement="right"
+        width={480}
+        open={open}
+        onClose={closeDrawer}
+        closeIcon={<CloseOutlined />}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={doCreate}
-          initialValues={{ network: "trc20" }}
-        >
-          <Form.Item
-            label="Amount (USD)"
-            name="amount"
-            rules={[{ required: true, message: "Please enter an amount" }]}
-          >
-            <InputNumber style={{ width: "100%" }} min={1} step={10} prefix="$" />
-          </Form.Item>
-          <Form.Item
-            label="Network"
-            name="network"
-            rules={[{ required: true, message: "Please select a network" }]}
-          >
-            <Select options={NETWORK_OPTIONS} />
-          </Form.Item>
-        </Form>
-      </Modal>
+        {!active ? (
+          // Form state
+          <Form form={form} layout="vertical" onFinish={doCreate} initialValues={{ network: "trc20", coin: "USDT", amount: 100 }}>
+            <div style={{ fontWeight: 600, color: BRAND.textPrimary, marginBottom: 8 }}>Select a coin to deposit</div>
+            <Form.Item name="coin">
+              <Select size="large" options={[{ value: "USDT", label: (<span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><Coin bg="#26A17B" label="₮" /> USDT</span>) }]} />
+            </Form.Item>
 
-      {/* Payment instructions modal */}
-      <Modal
-        title="Deposit payment instructions"
-        open={!!active}
-        onCancel={() => setActive(null)}
-        width={560}
-        footer={[
-          <Button
-            key="check"
-            icon={<ReloadOutlined />}
-            loading={checking}
-            onClick={checkStatus}
-          >
-            Check status
-          </Button>,
-          <Button key="close" type="primary" onClick={() => setActive(null)}>
-            Close
-          </Button>,
-        ]}
-      >
-        {active && (
-          <>
-            <div style={{ marginBottom: 16 }}>
-              <DepositStatusTag status={active.status} />
+            <div style={{ fontWeight: 600, color: BRAND.textPrimary, margin: "10px 0 8px" }}>Network</div>
+            <Form.Item name="network" rules={[{ required: true, message: "Select a network" }]}>
+              <Select
+                size="large"
+                options={NETWORK_OPTIONS.map((n) => ({
+                  value: n.value,
+                  label: (<span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><Coin bg={NET_BG[n.value]} label={n.label[0]} /> {n.label} · {n.chain}</span>),
+                }))}
+              />
+            </Form.Item>
+
+            <div style={{ fontWeight: 600, color: BRAND.textPrimary, margin: "10px 0 8px" }}>Amount (USD)</div>
+            <Form.Item name="amount" rules={[{ required: true, message: "Enter an amount" }]}>
+              <InputNumber size="large" style={{ width: "100%" }} min={1} step={10} prefix="$" />
+            </Form.Item>
+
+            <Button type="primary" htmlType="submit" block loading={creating} style={{ height: 48, borderRadius: 12, marginTop: 8 }}>
+              Continue
+            </Button>
+          </Form>
+        ) : (
+          // Invoice state
+          <div>
+            <div style={{ fontWeight: 600, color: BRAND.textPrimary, marginBottom: 8 }}>Coin</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, border: `1px solid ${BRAND.border}`, borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
+              <Coin bg="#26A17B" label="₮" /> <span style={{ fontWeight: 500 }}>{active.asset}</span>
             </div>
 
-            {/* Amount callout */}
-            <div
-              style={{
-                background: BRAND.gradient,
-                borderRadius: 14,
-                padding: "18px 20px",
-                color: "#fff",
-                marginBottom: 18,
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-              }}
-            >
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 12,
-                  background: "rgba(255,255,255,.18)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  flexShrink: 0,
-                }}
-              >
-                <WalletOutlined />
-              </div>
-              <div>
-                <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.8)" }}>
-                  Send exactly
-                </div>
-                <div
-                  className="tabular"
-                  style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.01em" }}
-                >
-                  {active.cryptoAmount} {active.asset}
-                </div>
-              </div>
+            <div style={{ fontWeight: 600, color: BRAND.textPrimary, marginBottom: 8 }}>Network</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, border: `1px solid ${BRAND.border}`, borderRadius: 12, padding: "12px 16px", marginBottom: 20 }}>
+              <Coin bg={NET_BG[active.network] || "#94A3B8"} label={(activeNet?.label || active.network)[0].toUpperCase()} />
+              <span style={{ fontWeight: 500 }}>{activeNet?.label || active.network.toUpperCase()}</span>
+              <span style={{ marginLeft: "auto" }}><DepositStatusTag status={active.status} /></span>
             </div>
 
-            {/* Scan-to-pay QR of the invoice address */}
+            <div style={{ fontWeight: 700, color: BRAND.textPrimary, marginBottom: 4 }}>Confirm your deposit details.</div>
+            <p style={{ color: BRAND.textSecondary, fontSize: 13.5, lineHeight: 1.5, marginTop: 0 }}>
+              Send only {active.asset} {activeNet?.label || active.network} to this address. Sending assets on other
+              networks or NFTs will result in irreversible loss of funds.
+            </p>
+
             {active.payAddress && (
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
-                <div
-                  style={{
-                    padding: 14,
-                    background: "#fff",
-                    border: `1px solid ${BRAND.borderSubtle}`,
-                    borderRadius: 16,
-                    boxShadow: "0 4px 14px rgba(16,24,40,.06)",
-                    textAlign: "center",
-                  }}
-                >
-                  <QRCodeSVG
-                    value={active.payAddress}
-                    size={168}
-                    level="M"
-                    marginSize={0}
-                    fgColor="#0F172A"
-                  />
-                  <div style={{ marginTop: 8, fontSize: 11.5, color: BRAND.textMuted }}>
-                    Scan to pay · {active.network.toUpperCase()}
-                  </div>
+              <div style={{ display: "flex", justifyContent: "center", margin: "18px 0" }}>
+                <div style={{ padding: 14, background: "#fff", border: `1px solid ${BRAND.borderSubtle}`, borderRadius: 16, boxShadow: "0 4px 14px rgba(16,24,40,.06)" }}>
+                  <QRCodeSVG value={active.payAddress} size={176} level="M" marginSize={0} fgColor="#0F172A" />
                 </div>
               </div>
             )}
 
-            <div
-              style={{
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: BRAND.textMuted,
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-                marginBottom: 6,
-              }}
-            >
-              Pay address · {active.network.toUpperCase()}
+            <div style={{ background: BRAND.primarySoft, color: BRAND.primary, borderRadius: 12, padding: "12px 16px", fontSize: 13.5, fontWeight: 500, marginBottom: 16 }}>
+              Send exactly <b>{active.cryptoAmount} {active.asset}</b>. Network fee for transfers is 0%.
             </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "stretch",
-              }}
-            >
-              <div
-                className="tabular"
-                style={{
-                  flex: 1,
-                  fontFamily: "monospace",
-                  fontSize: 15,
-                  wordBreak: "break-all",
-                  background: BRAND.primarySoft,
-                  border: `1px solid ${BRAND.primarySoft2}`,
-                  color: BRAND.textPrimary,
-                  borderRadius: 12,
-                  padding: "14px 16px",
-                  lineHeight: 1.5,
-                }}
-              >
-                {active.payAddress}
+
+            <div style={{ background: BRAND.appBg, border: `1px solid ${BRAND.borderSubtle}`, borderRadius: 14, padding: 18 }}>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12.5, color: BRAND.textMuted, marginBottom: 6 }}>{active.asset} address</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="tabular" style={{ flex: 1, fontFamily: "monospace", fontSize: 14, color: BRAND.textPrimary, wordBreak: "break-all", lineHeight: 1.5 }}>{active.payAddress}</span>
+                  <Tooltip title="Copy address"><Button type="text" shape="circle" icon={<CopyOutlined style={{ color: BRAND.textMuted }} />} onClick={() => copy(active.payAddress, "Address")} /></Tooltip>
+                </div>
               </div>
-              <Tooltip title="Copy address">
-                <Button
-                  type="primary"
-                  icon={<CopyOutlined />}
-                  style={{ height: "auto" }}
-                  onClick={() => copy(active.payAddress, "Pay address")}
-                />
-              </Tooltip>
+              <div>
+                <div style={{ fontSize: 12.5, color: BRAND.textMuted, marginBottom: 4 }}>Exchange rate</div>
+                <div className="tabular" style={{ fontSize: 15, fontWeight: 600, color: BRAND.textPrimary }}>1 {active.asset} = {formatMoney(rate, active.currency)}</div>
+              </div>
             </div>
 
-            <div
-              style={{
-                marginTop: 12,
-                fontSize: 13,
-                color: BRAND.textSecondary,
-                background: BRAND.warningSoft,
-                border: `1px solid #FDE68A`,
-                borderRadius: 10,
-                padding: "10px 14px",
-              }}
-            >
-              Send the exact amount; your balance is credited automatically once
-              confirmed.
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <Button block icon={<ReloadOutlined />} loading={checking} onClick={checkStatus} style={{ height: 46, borderRadius: 12 }}>Check status</Button>
+              <Button block type="primary" onClick={openNew} style={{ height: 46, borderRadius: 12 }}>New deposit</Button>
             </div>
-
-            <Divider style={{ margin: "18px 0" }} />
-
-            <Descriptions column={1} size="small">
-              <Descriptions.Item label="Amount (USD)">
-                <MoneyText value={active.amount} currency={active.currency} strong />
-              </Descriptions.Item>
-              <Descriptions.Item label="Crypto amount">
-                <Space>
-                  <Text strong className="tabular">
-                    {active.cryptoAmount} {active.asset}
-                  </Text>
-                  <Tooltip title="Copy amount">
-                    <Button
-                      size="small"
-                      type="text"
-                      icon={<CopyOutlined />}
-                      onClick={() => copy(active.cryptoAmount, "Amount")}
-                    />
-                  </Tooltip>
-                </Space>
-              </Descriptions.Item>
-              <Descriptions.Item label="Network">
-                <span style={{ textTransform: "uppercase" }}>{active.network}</span>
-              </Descriptions.Item>
-              <Descriptions.Item label="Expires at">
-                {active.expiresAt &&
-                new Date(active.expiresAt).getFullYear() > 2000
-                  ? formatDate(active.expiresAt)
-                  : "—"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Created">
-                {formatDate(active.createdAt)}
-              </Descriptions.Item>
-            </Descriptions>
-          </>
+          </div>
         )}
-      </Modal>
+      </Drawer>
     </div>
   );
 };

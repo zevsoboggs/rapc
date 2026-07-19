@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import React from "react";
 import {
   Empty,
   App as AntdApp,
@@ -10,15 +11,35 @@ import {
   Segmented,
   Collapse,
   Grid,
+  Drawer,
 } from "antd";
-import { InboxOutlined } from "@ant-design/icons";
+import {
+  InboxOutlined,
+  CloseCircleFilled,
+  RightOutlined,
+  QuestionCircleOutlined,
+  MessageOutlined,
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { api } from "../providers/axios";
 import type { Program, BatchOrder } from "../types";
 import { formatMoney } from "../utils/format";
 import { ProgramTile } from "../components/ProgramTile";
 import { ProgramCardSkeleton } from "../components/Skeletons";
+import { ServiceIcon } from "../components/ServiceIcon";
+import {
+  servicesForProgram,
+  PROHIBITED_SERVICES,
+  PROHIBITED_COUNTRIES,
+  PROHIBITED_CATEGORIES,
+} from "../data/compliance";
 import { BRAND, CARD_SHADOW } from "../theme";
+
+interface ListView {
+  title: string;
+  subtitle?: string;
+  items: { icon: React.ReactNode; label: string }[];
+}
 
 const cardBox: React.CSSProperties = {
   background: "#fff",
@@ -54,10 +75,30 @@ export const ProgramsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"categories" | "bin">("categories");
 
+  const [detail, setDetail] = useState<Program | null>(null);
+  const [tariffsOpen, setTariffsOpen] = useState(false);
+  const [list, setList] = useState<ListView | null>(null);
+
   const [batchProgram, setBatchProgram] = useState<Program | null>(null);
   const [ordering, setOrdering] = useState(false);
   const [batchForm] = Form.useForm<{ quantity: number; notes?: string }>();
   const quantity = Form.useWatch("quantity", batchForm);
+
+  const openDetail = (p: Program) => { setTariffsOpen(false); setDetail(p); };
+  const codeToFlag = (code: string) =>
+    /^[A-Za-z]{2}$/.test(code)
+      ? code.toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)))
+      : "🏴";
+  const flagIcon = (code: string) => (
+    <span style={{ width: 40, height: 40, borderRadius: "50%", background: BRAND.appBg, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{codeToFlag(code)}</span>
+  );
+  const xIcon = (
+    <span style={{ width: 40, height: 40, borderRadius: "50%", background: BRAND.errorSoft, color: BRAND.error, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}><CloseCircleFilled /></span>
+  );
+  const showServices = (p: Program) => setList({ title: "Services & subscriptions", subtitle: "Works best with these services:", items: servicesForProgram(p).map((s) => ({ icon: <ServiceIcon service={s} />, label: s.name })) });
+  const showProhServices = () => setList({ title: "Prohibited services", subtitle: "These services are not supported:", items: PROHIBITED_SERVICES.map((s) => ({ icon: <ServiceIcon service={s} />, label: s.name })) });
+  const showCountries = () => setList({ title: "Prohibited countries", subtitle: "Payments in these regions are declined:", items: PROHIBITED_COUNTRIES.map((c) => ({ icon: flagIcon(c.code), label: c.name })) });
+  const showCategories = () => setList({ title: "Prohibited categories", subtitle: "These merchant categories are blocked:", items: PROHIBITED_CATEGORIES.map((c) => ({ icon: xIcon, label: c })) });
 
   useEffect(() => {
     api
@@ -164,9 +205,9 @@ export const ProgramsPage: React.FC = () => {
             </div>
           ) : tab === "categories" ? (
             programs.map((p) => (
-              <div key={p.id} style={{ ...cardBox, padding: 20, display: "flex", gap: 22, alignItems: "stretch", flexWrap: narrow ? "wrap" : "nowrap" }}>
+              <div key={p.id} onClick={() => openDetail(p)} className="rc-elevate" style={{ ...cardBox, padding: 20, display: "flex", gap: 22, alignItems: "stretch", flexWrap: narrow ? "wrap" : "nowrap", cursor: "pointer" }}>
                 <div style={{ width: narrow ? "100%" : 240, flexShrink: 0 }}>
-                  <ProgramTile name={p.name} seed={p.id} color={p.cardColor} height={narrow ? 150 : 168} />
+                  <ProgramTile name={p.name} seed={p.id} color={p.cardColor} artworkSvg={p.artworkSvg} height={narrow ? 150 : 168} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 16 }}>
                   <div>
@@ -181,13 +222,13 @@ export const ProgramsPage: React.FC = () => {
                     <Fee value={`${p.topupFeePercent ?? "0"}%`} label="On top-up" />
                     <div style={{ flex: 1 }} />
                     {p.cardType === "PHYSICAL" && (
-                      <Button icon={<InboxOutlined />} style={{ height: 44, borderRadius: 12 }} onClick={() => openBatch(p)}>
+                      <Button icon={<InboxOutlined />} style={{ height: 44, borderRadius: 12 }} onClick={(e) => { e.stopPropagation(); openBatch(p); }}>
                         Order batch
                       </Button>
                     )}
                     <button
                       style={getBtn}
-                      onClick={() => navigate(`/cards?issue=${p.id}`)}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/cards?issue=${p.id}`); }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = BRAND.primarySoft2)}
                       onMouseLeave={(e) => (e.currentTarget.style.background = BRAND.primarySoft)}
                     >
@@ -204,12 +245,12 @@ export const ProgramsPage: React.FC = () => {
                 <span>Program</span><span>BIN</span><span>Issue</span><span>Top-up</span><span />
               </div>
               {programs.map((p) => (
-                <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 0.8fr 0.8fr 130px", gap: 12, padding: "16px 22px", alignItems: "center", borderBottom: `1px solid ${BRAND.borderSubtle}` }}>
+                <div key={p.id} onClick={() => openDetail(p)} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 0.8fr 0.8fr 130px", gap: 12, padding: "16px 22px", alignItems: "center", borderBottom: `1px solid ${BRAND.borderSubtle}`, cursor: "pointer" }}>
                   <span style={{ fontWeight: 600, color: BRAND.textPrimary }}>{p.name}</span>
                   <span className="tabular" style={{ fontFamily: "monospace", color: BRAND.textSecondary }}>{p.bin || "—"}</span>
                   <span className="tabular" style={{ color: BRAND.textSecondary }}>{formatMoney(p.issuanceFee, p.currency)}</span>
                   <span className="tabular" style={{ color: BRAND.textSecondary }}>{p.topupFeePercent ?? "0"}%</span>
-                  <button style={{ ...getBtn, height: 38, padding: "0 16px", fontSize: 14 }} onClick={() => navigate(`/cards?issue=${p.id}`)}>Get card</button>
+                  <button style={{ ...getBtn, height: 38, padding: "0 16px", fontSize: 14 }} onClick={(e) => { e.stopPropagation(); navigate(`/cards?issue=${p.id}`); }}>Get card</button>
                 </div>
               ))}
             </div>
@@ -221,6 +262,87 @@ export const ProgramsPage: React.FC = () => {
           {infoPanel}
         </div>
       </div>
+
+      {/* Program details drawer */}
+      <Drawer
+        title={detail?.name}
+        placement="right"
+        width={460}
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        footer={detail ? (
+          <Button type="primary" block style={{ height: 48, borderRadius: 12, fontWeight: 600 }} onClick={() => { const id = detail.id; setDetail(null); navigate(`/cards?issue=${id}`); }}>
+            Get card
+          </Button>
+        ) : null}
+      >
+        {detail && (() => {
+          const svc = servicesForProgram(detail);
+          const preview = svc.slice(0, 4);
+          const more = svc.length - preview.length;
+          const rowBtn: React.CSSProperties = { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: BRAND.appBg, border: `1px solid ${BRAND.borderSubtle}`, borderRadius: 14, padding: "14px 16px", marginBottom: 12, cursor: "pointer" };
+          return (
+            <div>
+              {detail.description && <p style={{ color: BRAND.textSecondary, fontSize: 14.5, lineHeight: 1.55, marginTop: 0 }}>{detail.description}</p>}
+
+              {/* Works with */}
+              <button onClick={() => showServices(detail)} style={rowBtn}>
+                <span style={{ color: BRAND.primary, fontWeight: 600 }}>Works with</span>
+                <span style={{ display: "flex", alignItems: "center" }}>
+                  {preview.map((s, i) => <span key={s.name} style={{ marginLeft: i ? -10 : 0 }}><ServiceIcon service={s} size={30} /></span>)}
+                  {more > 0 && <span style={{ marginLeft: -10, width: 30, height: 30, borderRadius: "50%", background: "#fff", border: `1px solid ${BRAND.borderSubtle}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: BRAND.textSecondary }}>+{more > 99 ? 99 : more}</span>}
+                </span>
+              </button>
+
+              {/* Tariffs & conditions */}
+              <button onClick={() => setTariffsOpen((v) => !v)} style={{ ...rowBtn, marginBottom: tariffsOpen ? 4 : 12 }}>
+                <span style={{ color: BRAND.primary, fontWeight: 600 }}>Tariffs & conditions</span>
+                <QuestionCircleOutlined style={{ color: BRAND.textMuted, fontSize: 18 }} />
+              </button>
+              {tariffsOpen && (
+                <div style={{ padding: "0 4px 12px", fontSize: 14 }}>
+                  <Line label="Issuance fee" value={formatMoney(detail.issuanceFee, detail.currency)} />
+                  {detail.cardType === "PHYSICAL" && <Line label="Shipping fee" value={formatMoney(detail.shippingFee, detail.currency)} />}
+                  <Line label="Top-up fee" value={`${detail.topupFeePercent ?? "0"}%`} />
+                  <Line label="Withdraw fee" value={`${detail.withdrawFeePercent ?? "0"}%`} />
+                  <Line label="Top-up limits" value={`${formatMoney(detail.minTopup, detail.currency)} – ${formatMoney(detail.maxTopup, detail.currency)}`} />
+                  <Line label="BIN" value={detail.bin || "—"} mono />
+                </div>
+              )}
+
+              {/* Prohibited */}
+              <div style={{ borderTop: `1px solid ${BRAND.borderSubtle}`, marginTop: 8 }}>
+                <ProhRow label="Prohibited services" onShow={showProhServices} />
+                <ProhRow label="Prohibited countries" onShow={showCountries} />
+                <ProhRow label="Prohibited categories" onShow={showCategories} />
+              </div>
+            </div>
+          );
+        })()}
+      </Drawer>
+
+      {/* Services / prohibited list drawer */}
+      <Drawer
+        title={list?.title}
+        placement="right"
+        width={420}
+        open={!!list}
+        onClose={() => setList(null)}
+        zIndex={1100}
+        footer={
+          <Button type="primary" block icon={<MessageOutlined />} style={{ height: 48, borderRadius: 12, fontWeight: 600 }} onClick={() => { setList(null); setDetail(null); navigate("/support"); }}>
+            Support
+          </Button>
+        }
+      >
+        {list?.subtitle && <p style={{ color: BRAND.textMuted, fontSize: 14, marginTop: 0, marginBottom: 8 }}>{list.subtitle}</p>}
+        {list?.items.map((it, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 0", borderBottom: `1px solid ${BRAND.borderSubtle}` }}>
+            {it.icon}
+            <span style={{ fontWeight: 500, color: BRAND.textPrimary, fontSize: 15 }}>{it.label}</span>
+          </div>
+        ))}
+      </Drawer>
 
       {/* Order batch modal */}
       <Modal
@@ -260,3 +382,22 @@ export const ProgramsPage: React.FC = () => {
     </div>
   );
 };
+
+const Line: React.FC<{ label: string; value: React.ReactNode; mono?: boolean }> = ({ label, value, mono }) => (
+  <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 0" }}>
+    <span style={{ color: BRAND.textMuted }}>{label}</span>
+    <span className={mono ? "tabular" : "tabular"} style={{ fontWeight: 600, color: BRAND.textPrimary, fontFamily: mono ? "monospace" : undefined }}>{value}</span>
+  </div>
+);
+
+const ProhRow: React.FC<{ label: string; onShow: () => void }> = ({ label, onShow }) => (
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0", borderBottom: `1px solid ${BRAND.borderSubtle}` }}>
+    <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <CloseCircleFilled style={{ color: BRAND.error, fontSize: 20 }} />
+      <span style={{ fontWeight: 500, color: BRAND.textPrimary, fontSize: 15 }}>{label}</span>
+    </span>
+    <button onClick={onShow} style={{ background: "none", border: "none", color: BRAND.primary, fontWeight: 600, fontSize: 14.5, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+      Show <RightOutlined style={{ fontSize: 11 }} />
+    </button>
+  </div>
+);
