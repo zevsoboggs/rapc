@@ -1,0 +1,164 @@
+:root {
+  --rc-app-bg: #f4f7fc;
+  --rc-border-subtle: #edf1f7;
+  --rc-card-shadow: 0 1px 2px rgba(16, 24, 40, 0.04),
+    0 4px 14px rgba(16, 24, 40, 0.05);
+  --rc-card-shadow-hover: 0 10px 28px rgba(16, 24, 40, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--rc-app-bg);
+  font-family: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular figures for money and counts */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin custom scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Card hover elevation utility */
+.rc-elevate {
+  transition: box-shadow 160ms ease;
+}
+.rc-elevate:hover {
+  box-shadow: var(--rc-card-shadow-hover) !important;
+}
+
+/* Header user button — subtle background hover, no movement */
+.rc-userbtn {
+  transition: background 140ms ease;
+}
+.rc-userbtn:hover {
+  background: #f4f7fc;
+}
+
+/* Card visual container query so PAN text scales with the card */
+.rc-card-visual {
+  container-type: inline-size;
+}
+
+/* Shimmer skeleton */
+@keyframes rc-shimmer {
+  0% {
+    background-position: -420px 0;
+  }
+  100% {
+    background-position: 420px 0;
+  }
+}
+.rc-skel {
+  position: relative;
+  overflow: hidden;
+  background: #eef2f8;
+  border-radius: 8px;
+  background-image: linear-gradient(
+    90deg,
+    #eef2f8 0px,
+    #f6f9fd 60px,
+    #eef2f8 120px
+  );
+  background-size: 420px 100%;
+  animation: rc-shimmer 1.25s ease-in-out infinite;
+}
+
+/* Nav group label in the sidebar */
+.rc-nav-group {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 16px 20px 6px;
+}
+
+/* Custom sidebar menu item */
+.rc-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 42px;
+  margin: 1px 10px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: #475569;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 120ms ease, color 120ms ease;
+}
+.rc-nav-item:hover {
+  background: #f4f7fc;
+  color: #0f172a;
+}
+.rc-nav-item.active {
+  background: #eff4ff;
+  color: #2563eb;
+  font-weight: 600;
+}
+.rc-nav-item.active .anticon {
+  color: #2563eb;
+}
+/* Sign-out item */
+.rc-signout:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+.rc-signout:hover .anticon {
+  color: #dc2626;
+}
+.rc-nav-item .anticon {
+  font-size: 18px;
+}
+
+/* Give resting cards a crisp border + soft shadow */
+.rc-card {
+  border: 1px solid var(--rc-border-subtle);
+  box-shadow: var(--rc-card-shadow);
+  border-radius: 16px;
+  background: #fff;
+}
+
+/* Sidebar refinements */
+.ant-layout-sider {
+  border-right: 1px solid var(--rc-border-subtle);
+}
+
+/* Remove heavy default card divider */
+.ant-card-head {
+  border-bottom: 1px solid var(--rc-border-subtle);
+}
