@@ -95,6 +95,8 @@ export interface Program {
   cardColor?: string | null;
   physicalStock?: number | null;
   inStock?: boolean;
+  applePay?: boolean;
+  googlePay?: boolean;
 }
 
 export interface Card {
@@ -159,18 +161,23 @@ export interface MoneyMovementResult {
 export interface ApiKey {
   id: string;
   label: string;
-  prefix: string;
+  keyId: string;
   scopes?: string[];
   isActive: boolean;
+  legacy?: boolean;
   lastUsedAt?: string | null;
+  lastUsedIp?: string | null;
+  expiresAt?: string | null;
   createdAt: string;
 }
 
 export interface CreatedApiKey {
   id: string;
   label: string;
-  prefix: string;
-  key: string;
+  keyId: string;
+  secret: string;
+  scopes: string[];
+  expiresAt?: string | null;
 }
 
 export interface Deposit {

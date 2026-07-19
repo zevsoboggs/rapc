@@ -294,6 +294,17 @@ export const ProgramsPage: React.FC = () => {
                 </span>
               </button>
 
+              {/* Digital wallets */}
+              {(detail.applePay || detail.googlePay) && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: BRAND.appBg, border: `1px solid ${BRAND.borderSubtle}`, borderRadius: 14, padding: "14px 16px", marginBottom: 12 }}>
+                  <span style={{ color: BRAND.textSecondary, fontWeight: 600 }}>Digital wallets</span>
+                  <span style={{ display: "flex", gap: 8 }}>
+                    {detail.applePay && <WalletChip label="Apple Pay" glyph="" />}
+                    {detail.googlePay && <WalletChip label="Google Pay" glyph="G" />}
+                  </span>
+                </div>
+              )}
+
               {/* Tariffs & conditions */}
               <button onClick={() => setTariffsOpen((v) => !v)} style={{ ...rowBtn, marginBottom: tariffsOpen ? 4 : 12 }}>
                 <span style={{ color: BRAND.primary, fontWeight: 600 }}>Tariffs & conditions</span>
@@ -382,6 +393,13 @@ export const ProgramsPage: React.FC = () => {
     </div>
   );
 };
+
+const WalletChip: React.FC<{ label: string; glyph: string }> = ({ label, glyph }) => (
+  <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#0f172a", color: "#fff", borderRadius: 8, padding: "6px 12px", fontSize: 13, fontWeight: 600 }}>
+    <span style={{ fontSize: 14 }}>{glyph}</span>
+    {label}
+  </span>
+);
 
 const Line: React.FC<{ label: string; value: React.ReactNode; mono?: boolean }> = ({ label, value, mono }) => (
   <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 0" }}>

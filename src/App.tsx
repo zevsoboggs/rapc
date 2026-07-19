@@ -44,6 +44,7 @@ import { DepositsPage } from "./pages/deposits";
 import { ApiKeysPage } from "./pages/api-keys";
 import { WebhooksPage } from "./pages/webhooks";
 import { BatchOrdersPage } from "./pages/batch-orders";
+import { SecurityPage } from "./pages/security";
 
 function App() {
   return (
@@ -117,6 +118,7 @@ function App() {
                 <Route path="/deposits" element={<DepositsPage />} />
                 <Route path="/billing" element={<BillingPage />} />
                 <Route path="/settings/api-keys" element={<ApiKeysPage />} />
+                <Route path="/settings/security" element={<SecurityPage />} />
                 <Route path="/webhooks" element={<WebhooksPage />} />
                 <Route path="/batch-orders" element={<BatchOrdersPage />} />
                 <Route path="/support" element={<SupportPage />} />

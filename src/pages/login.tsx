@@ -1,11 +1,14 @@
-import { useLogin } from "@refinedev/core";
-import { Button, Form, Input, Grid } from "antd";
+import { useState } from "react";
+import { Button, Form, Input, Grid, Alert } from "antd";
 import {
   MailOutlined,
   LockOutlined,
   CheckCircleFilled,
+  SafetyOutlined,
+  ArrowLeftOutlined,
 } from "@ant-design/icons";
 import { Brand } from "../components/Brand";
+import { api, TOKEN_KEY } from "../providers/axios";
 import { BRAND, CARD_SHADOW } from "../theme";
 
 const { useBreakpoint } = Grid;
@@ -21,9 +24,55 @@ const FEATURES = [
   "Full programmatic access via API keys",
 ];
 
+function apiError(e: unknown, fallback: string): string {
+  return (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
+}
+
 export const LoginPage: React.FC = () => {
-  const { mutate: login, isLoading } = useLogin<LoginValues>();
   const screens = useBreakpoint();
+  const [stage, setStage] = useState<"creds" | "2fa">("creds");
+  const [challenge, setChallenge] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const finish = (token: string) => {
+    localStorage.setItem(TOKEN_KEY, token);
+    window.location.href = "/";
+  };
+
+  const submitCreds = async (values: LoginValues) => {
+    setLoading(true);
+    setError("");
+    try {
+      const { data } = await api.post("/auth/client/login", values);
+      if (data?.twoFactorRequired && data?.challenge) {
+        setChallenge(data.challenge);
+        setStage("2fa");
+      } else if (data?.token) {
+        finish(data.token);
+      } else {
+        setError("Invalid response from server");
+      }
+    } catch (e) {
+      setError(apiError(e, "Invalid email or password"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submit2fa = async (values: { code: string }) => {
+    setLoading(true);
+    setError("");
+    try {
+      const { data } = await api.post("/auth/client/2fa", { challenge, code: values.code });
+      if (data?.token) finish(data.token);
+      else setError("Invalid response from server");
+    } catch (e) {
+      setError(apiError(e, "Invalid authentication code"));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: "#fff" }}>
@@ -154,70 +203,111 @@ export const LoginPage: React.FC = () => {
               color: BRAND.textPrimary,
             }}
           >
-            Sign in
+            {stage === "creds" ? "Sign in" : "Two-factor authentication"}
           </h2>
           <p style={{ margin: "6px 0 24px", color: BRAND.textSecondary }}>
-            Welcome back. Please enter your details.
+            {stage === "creds"
+              ? "Welcome back. Please enter your details."
+              : "Enter the 6-digit code from your authenticator app."}
           </p>
 
-          <Form<LoginValues>
-            layout="vertical"
-            onFinish={(values) => login(values)}
-            requiredMark={false}
-            size="large"
-          >
-            <Form.Item
-              label="Email"
-              name="email"
-              rules={[
-                { required: true, message: "Please enter your email" },
-                { type: "email", message: "Please enter a valid email" },
-              ]}
-            >
-              <Input
-                prefix={<MailOutlined style={{ color: BRAND.textMuted }} />}
-                placeholder="you@company.com"
-                autoComplete="username"
-              />
-            </Form.Item>
+          {error && (
+            <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />
+          )}
 
-            <Form.Item
-              label="Password"
-              name="password"
-              rules={[{ required: true, message: "Please enter your password" }]}
+          {stage === "creds" ? (
+            <Form<LoginValues>
+              layout="vertical"
+              onFinish={submitCreds}
+              requiredMark={false}
+              size="large"
             >
-              <Input.Password
-                prefix={<LockOutlined style={{ color: BRAND.textMuted }} />}
-                placeholder="Your password"
-                autoComplete="current-password"
-              />
-            </Form.Item>
-
-            <Form.Item style={{ marginBottom: 0, marginTop: 8 }}>
-              <Button
-                type="primary"
-                htmlType="submit"
-                size="large"
-                block
-                loading={isLoading}
-                style={{ height: 46, fontWeight: 600 }}
+              <Form.Item
+                label="Email"
+                name="email"
+                rules={[
+                  { required: true, message: "Please enter your email" },
+                  { type: "email", message: "Please enter a valid email" },
+                ]}
               >
-                Sign in
-              </Button>
-            </Form.Item>
-          </Form>
+                <Input
+                  prefix={<MailOutlined style={{ color: BRAND.textMuted }} />}
+                  placeholder="you@company.com"
+                  autoComplete="username"
+                />
+              </Form.Item>
 
-          <p
-            style={{
-              textAlign: "center",
-              marginTop: 22,
-              marginBottom: 0,
-              fontSize: 12.5,
-              color: BRAND.textMuted,
-            }}
-          >
-            Secure access for RapidCard.pro client tenants.
-          </p>
+              <Form.Item
+                label="Password"
+                name="password"
+                rules={[{ required: true, message: "Please enter your password" }]}
+              >
+                <Input.Password
+                  prefix={<LockOutlined style={{ color: BRAND.textMuted }} />}
+                  placeholder="Your password"
+                  autoComplete="current-password"
+                />
+              </Form.Item>
+
+              <Form.Item style={{ marginBottom: 0, marginTop: 8 }}>
+                <Button type="primary" htmlType="submit" size="large" block loading={loading} style={{ height: 46, fontWeight: 600 }}>
+                  Sign in
+                </Button>
+              </Form.Item>
+            </Form>
+          ) : (
+            <Form
+              layout="vertical"
+              onFinish={submit2fa}
+              requiredMark={false}
+              size="large"
+            >
+              <Form.Item
+                label="Authentication code"
+                name="code"
+                rules={[
+                  { required: true, message: "Enter your 6-digit code" },
+                  { pattern: /^\d{6}$/, message: "Code is 6 digits" },
+                ]}
+              >
+                <Input
+                  prefix={<SafetyOutlined style={{ color: BRAND.textMuted }} />}
+                  placeholder="123456"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoFocus
+                  autoComplete="one-time-code"
+                  style={{ letterSpacing: "0.3em", fontWeight: 600 }}
+                />
+              </Form.Item>
+
+              <Form.Item style={{ marginBottom: 8, marginTop: 8 }}>
+                <Button type="primary" htmlType="submit" size="large" block loading={loading} style={{ height: 46, fontWeight: 600 }}>
+                  Verify & sign in
+                </Button>
+              </Form.Item>
+              <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => { setStage("creds"); setError(""); }} style={{ color: BRAND.textSecondary }}>
+                Back to sign in
+              </Button>
+              <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12.5, color: BRAND.textMuted }}>
+                Lost your device? Enter one of your backup codes instead.
+              </p>
+            </Form>
+          )}
+
+          {stage === "creds" && (
+            <p
+              style={{
+                textAlign: "center",
+                marginTop: 22,
+                marginBottom: 0,
+                fontSize: 12.5,
+                color: BRAND.textMuted,
+              }}
+            >
+              Secure access for RapidCard.pro client tenants.
+            </p>
+          )}
         </div>
       </div>
     </div>

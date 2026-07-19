@@ -15,6 +15,7 @@ import {
   MessageOutlined,
   BookOutlined,
   MenuOutlined,
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import { Brand } from "./Brand";
 import { WhatsNewModal } from "./WhatsNewModal";
@@ -40,6 +41,7 @@ const MORE: { to: string; label: string; icon: React.ReactNode }[] = [
   { to: "/deliveries", label: "Deliveries", icon: <CarOutlined /> },
   { to: "/batch-orders", label: "Card batches", icon: <InboxOutlined /> },
   { to: "/settings/api-keys", label: "API keys", icon: <ApiOutlined /> },
+  { to: "/settings/security", label: "Security", icon: <SafetyCertificateOutlined /> },
   { to: "/webhooks", label: "Webhooks", icon: <ThunderboltOutlined /> },
   { to: "/support", label: "Support", icon: <MessageOutlined /> },
 ];
