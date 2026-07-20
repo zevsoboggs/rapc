@@ -52,11 +52,6 @@ const DeliveryTimeline: React.FC<{ s: Shipment }> = ({ s }) => {
           ),
         }))}
       />
-      {s.trackingUrl && (
-        <a href={s.trackingUrl} target="_blank" rel="noreferrer" style={{ color: BRAND.primary, fontWeight: 500 }}>
-          Track on carrier site ↗
-        </a>
-      )}
     </div>
   );
 };
@@ -138,19 +133,10 @@ export const DeliveriesPage: React.FC = () => {
                 render: (v: string) => <StatusPill kind="shipment" status={v} />,
               },
               {
-                title: "Carrier / Tracking",
+                title: "Tracking number",
                 render: (_, r) =>
                   r.trackingNumber ? (
-                    <span>
-                      {r.carrier ? `${r.carrier} · ` : ""}
-                      {r.trackingUrl ? (
-                        <a href={r.trackingUrl} target="_blank" rel="noreferrer" className="tabular" style={{ fontFamily: "monospace", color: BRAND.primary }}>
-                          {r.trackingNumber}
-                        </a>
-                      ) : (
-                        <Text className="tabular" style={{ fontFamily: "monospace" }}>{r.trackingNumber}</Text>
-                      )}
-                    </span>
+                    <Text className="tabular" style={{ fontFamily: "monospace" }}>{r.trackingNumber}</Text>
                   ) : (
                     <Text type="secondary">Not shipped yet</Text>
                   ),

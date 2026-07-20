@@ -416,8 +416,24 @@ export const CardShowPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: transactions */}
+        {/* Right: delivery (physical) + transactions */}
         <div style={{ flex: "2 1 460px", minWidth: 320 }}>
+          {card.cardType === "PHYSICAL" && (
+            <div style={{ ...cardBox, padding: 22, marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.textPrimary, marginBottom: 6 }}>Delivery</div>
+              <DeliveryRow label="Status" value={DELIVERY_LABEL[card.deliveryStatus || ""] || card.deliveryStatus || "Not shipped yet"} />
+              <DeliveryRow label="Tracking number" value={card.trackingNumber || "Not shipped yet"} mono copyable={!!card.trackingNumber} />
+              {card.activationCode && <DeliveryRow label="Activation code" value={card.activationCode} mono copyable />}
+              {card.activationPin && <DeliveryRow label="Activation PIN" value={card.activationPin} mono />}
+              {card.shipping?.recipientName && <DeliveryRow label="Recipient" value={card.shipping.recipientName} />}
+              {card.shipping && (
+                <DeliveryRow
+                  label="Address"
+                  value={[card.shipping.line1, card.shipping.line2, card.shipping.city, card.shipping.state, card.shipping.postalCode, card.shipping.country].filter(Boolean).join(", ")}
+                />
+              )}
+            </div>
+          )}
           <div style={{ ...cardBox, overflow: "hidden" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 130px 120px 120px", gap: 12, padding: "16px 24px", color: BRAND.textMuted, fontSize: 13, borderBottom: `1px solid ${BRAND.borderSubtle}` }}>
               <span>Description</span><span>Time</span><span>Card</span><span style={{ textAlign: "right" }}>Amount</span>
@@ -626,6 +642,33 @@ const Row: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value
     <span style={{ fontWeight: 500, color: BRAND.textPrimary }}>{value}</span>
   </div>
 );
+
+const DELIVERY_LABEL: Record<string, string> = {
+  pending: "Order placed",
+  processing: "Preparing",
+  in_production: "In production",
+  shipped: "Shipped",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+  returned: "Returned",
+};
+
+const DeliveryRow: React.FC<{ label: string; value: string; mono?: boolean; copyable?: boolean }> = ({ label, value, mono, copyable }) => {
+  const { message } = AntdApp.useApp();
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 0", borderTop: `1px solid ${BRAND.borderSubtle}` }}>
+      <span style={{ color: BRAND.textMuted, fontSize: 14 }}>{label}</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <span className={mono ? "tabular" : undefined} style={{ fontFamily: mono ? "monospace" : undefined, fontWeight: 600, color: BRAND.textPrimary, textAlign: "right", wordBreak: "break-word" }}>{value}</span>
+        {copyable && (
+          <Tooltip title="Copy">
+            <Button type="text" size="small" shape="circle" icon={<CopyOutlined style={{ color: BRAND.textMuted }} />} onClick={() => copyText(value, label, (m) => message.success(m))} />
+          </Tooltip>
+        )}
+      </span>
+    </div>
+  );
+};
 
 function formatCardNumber(n?: string | null): string {
   if (!n) return "";
